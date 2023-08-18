@@ -23,12 +23,6 @@ user = os.getenv("PGUSER")
 password = os.getenv("PGPASSWORD")
 port = os.getenv("PGPORT")
 
-# host = "127.0.0.1"
-# database = "adventure_works"
-# user = "postgres"
-# password = "mysecretpassword"
-# port = 5432
-
 # Create the SQLAlchemy engine
 engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}/{database}")
 
@@ -38,7 +32,7 @@ faker = Faker()
 # Create a metadata object
 metadata = MetaData(bind=engine)
 
-# Ignore terminal  xml type warnings
+# Ignore terminal xml type warnings
 warnings.filterwarnings("ignore", category=SAWarning)
 
 # Reflect metadata/schema from existing postgres database
@@ -817,3 +811,53 @@ class Data:
                 )  # Add generated ID to existing IDs set
 
             connection.execute(store_table.insert(), rows)
+
+class GenerateData:
+    """
+    generate a specific number of records to a target table in the
+    postgres database.
+    """
+
+    def __init__(self, table:str, num_records:int):
+        """
+        define command line arguments.
+        """
+        self.table = table
+        self.num_records = num_records
+
+        # create switcher to run the populate functions
+        self.switcher = {
+            "countryregioncurrency": Data().populate_countryregioncurrency,
+            "creditcard": Data().populate_creditcard,
+            "currency": Data().populate_currency,
+            "currencyrate": Data().populate_currencyrate,
+            "customer": Data().populate_customer,
+            "personcreditcard": Data().populate_personcreditcard,
+            "salesorderdetail": Data().populate_salesorderdetail,
+            "salesorderheader": Data().populate_salesorderheader,
+            "salesorderheadersalesreason": Data().populate_salesorderheadersalesreason,
+            "salesperson": Data().populate_salesperson,
+            "salespersonquotahistory": Data().populate_salespersonquotahistory,
+            "salesreason": Data().populate_salesreason,
+            "salestaxrate": Data().populate_salestaxrate,
+            "salesterritory": Data().populate_salesterritory,
+            "salesterritoryhistory": Data().populate_salesterritoryhistory,
+            "shoppingcartitem": Data().populate_shoppingcartitem,
+            "specialoffer": Data().populate_specialoffer,
+            "specialofferproduct": Data().populate_specialofferproduct,
+            "store": Data().populate_store,
+        }
+
+    def create_data(self):
+        """
+        Using the faker library, generate data and execute DML.
+        """
+        # table_names = [table.split('.')[-1] for table in metadata.tables.keys()]
+        if self.table not in self.switcher.keys():
+            return loggy.info(f"{self.table} table does not exist.")
+
+        # calling functions based on table name
+        loggy.info(f"Creating {self.num_records} records in {self.table}...")
+        self.switcher.get(self.table)(self.num_records)
+        loggy.info(f"{self.num_records} records created in {self.table}")
+

@@ -11,7 +11,7 @@ make db_bootstrap # Adds the Seed Data to the Database
 
 ## Generate Data
 ```bash
-python generate_data.py <table_name> <number_of_rows_to_insert>
+python generate_data.py --table <table_name> --num_records <number_of_rows_to_insert>
 ```
 #### Available Tables to Generate Data
 Valid tables so far:

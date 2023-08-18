@@ -35,11 +35,6 @@ db_bootstrap:
 	@ PGPASSWORD=mysecretpassword psql -U $(PGUSER) -p $(PGPORT) -d $(ADVENTUREWORKSNAME) -h $(PGHOST) -f sql/install.sql
 .PHONY: db_bootstrap
 
-## Generates Data for Table
-db_generate:
-	@ cd src && python generate_data.py $(table_name) $(num_rows)
-.PHONY: db_generate
-
 ## Create header
 _header:
 	@ printf "${GREEN}$$HEADER\n${RESET}"
