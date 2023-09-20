@@ -6,7 +6,8 @@ import random
 from datetime import datetime, timedelta
 import warnings
 from sqlalchemy.exc import SAWarning, IntegrityError
-from sqlalchemy import create_engine, MetaData, select, and_, update, func
+from sqlalchemy import create_engine, MetaData, select, and_, or_, update, func
+from sqlalchemy.sql import delete
 from faker import Faker
 from logger import get_logger
 from dotenv import load_dotenv
@@ -82,6 +83,19 @@ employee_table = metadata.tables["humanresources.employee"]
 shipmethod_table = metadata.tables["purchasing.shipmethod"]
 
 
+# helper functions
+def get_total_records(table):
+    """Get the total number of records in the specified table."""
+    return engine.execute(select([func.count()]).select_from(table)).scalar()
+
+
+def check_delete_count(table, delete_count):
+    """Check if the delete count exceeds the total number of records in the table."""
+    total_records = get_total_records(table)
+    if delete_count > total_records:
+        raise ValueError("Delete count exceeds the total number of records.")
+
+
 class Data:
     def __init__(self):
         pass
@@ -123,6 +137,36 @@ class Data:
                         .values(fake_data)
                     )
                     connection.execute(update_query)
+                elif action == 'delete':
+
+                    check_delete_count(
+                        countryregioncurrency_table, insert_count)
+
+                    # Use a subquery to select random records to delete
+                    subquery = (
+                        select([countryregioncurrency_table.c.countryregioncode,
+                               countryregioncurrency_table.c.currencycode])
+                        .order_by(func.random())
+                        .limit(insert_count)
+                    )
+
+                    # Build a list of conditions for deletion
+                    conditions = []
+                    for row in connection.execute(subquery):
+                        condition = (
+                            (countryregioncurrency_table.c.countryregioncode == row.countryregioncode) &
+                            (countryregioncurrency_table.c.currencycode ==
+                             row.currencycode)
+                        )
+                        conditions.append(condition)
+
+                    # Combine conditions using the or_ operator
+                    delete_query = countryregioncurrency_table.delete().where(or_(*conditions))
+
+                    # Execute the delete query
+                    connection.execute(delete_query)
+                else:
+                    raise ValueError("Invalid action provided")
 
     @staticmethod
     def populate_creditcard(action: str, insert_count: int):
@@ -171,6 +215,45 @@ class Data:
                         .values(insert_data[indx])
                     )
                     connection.execute(update_query)
+            elif action == "delete":
+                # Check if the delete count exceeds the total number of records in the table
+                check_delete_count(creditcard_table, insert_count)
+
+                # Use a subquery to select random records to delete
+                subquery = (
+                    select([creditcard_table.c.creditcardid])
+                    .order_by(func.random())
+                    .limit(insert_count)
+                )
+
+                with engine.begin() as connection:
+                    related_creditcard_ids = [
+                        row.creditcardid for row in connection.execute(subquery)]
+                    # Delete related records in personcreditcard_table
+                    for creditcardid in related_creditcard_ids:
+                        # Delete records in personcreditcard_table where creditcardid matches
+                        delete_personcreditcard = personcreditcard_table.delete().where(
+                            personcreditcard_table.c.creditcardid == creditcardid
+                        )
+                        connection.execute(delete_personcreditcard)
+
+                    # Delete related records in salesorderheader_table
+                    for creditcardid in related_creditcard_ids:
+                        # Delete records in salesorderheader_table where creditcardid matches
+                        delete_salesorderheader = salesorderheader_table.delete().where(
+                            salesorderheader_table.c.creditcardid == creditcardid
+                        )
+                        connection.execute(delete_salesorderheader)
+
+                    # Delete records in creditcard_table
+                    for creditcardid in related_creditcard_ids:
+                        # Delete records in creditcard_table where creditcardid matches
+                        delete_creditcard = creditcard_table.delete().where(
+                            creditcard_table.c.creditcardid == creditcardid
+                        )
+                        connection.execute(delete_creditcard)
+            else:
+                raise ValueError("Invalid action provided")
 
     @staticmethod
     def populate_currency(action: str, insert_count: int):
@@ -207,6 +290,35 @@ class Data:
                         .values(new_data)
                     )
                     connection.execute(update_currency_query)
+            elif action == "delete":
+                # Check if the delete count exceeds the total number of records in the table
+                check_delete_count(currency_table, insert_count)
+
+                # Use a subquery to select random records to delete
+                subquery = (
+                    select([currency_table.c.currencycode])
+                    .order_by(func.random())
+                    .limit(insert_count)
+                )
+
+                with engine.begin() as connection:
+                    # Delete related records in countryregioncurrency_table
+                    related_currency_codes = [
+                        row.currencycode for row in connection.execute(subquery)]
+                    for currency_code in related_currency_codes:
+                        # Delete records in countryregioncurrency_table where currencycode matches
+                        delete_countryregioncurrency = countryregioncurrency_table.delete().where(
+                            countryregioncurrency_table.c.currencycode == currency_code
+                        )
+                        connection.execute(delete_countryregioncurrency)
+
+                    # Delete records in currency_table
+                    for currency_code in related_currency_codes:
+                        # Delete records in currency_table where currencycode matches
+                        delete_currency = currency_table.delete().where(
+                            currency_table.c.currencycode == currency_code
+                        )
+                        connection.execute(delete_currency)
             else:
                 raise ValueError("Invalid action provided")
 
@@ -255,6 +367,32 @@ class Data:
                         .values(fakedata[indx])
                     )
                     connection.execute(update_query)
+            elif action == "delete":
+                # Check if the delete count exceeds the total number of records in the table
+                check_delete_count(currencyrate_table, insert_count)
+
+                # Use a subquery to select random records to delete
+                subquery = (
+                    select([currencyrate_table.c.currencyrateid])
+                    .order_by(func.random())
+                    .limit(insert_count)
+                )
+
+                # Build a list of conditions for deletion
+                conditions = []
+                for row in connection.execute(subquery):
+                    condition = (
+                        currencyrate_table.c.currencyrateid == row.currencyrateid
+                    )
+                    conditions.append(condition)
+
+                # Combine conditions using the or_ operator
+                delete_query = currencyrate_table.delete().where(or_(*conditions))
+
+                # Execute the delete query
+                connection.execute(delete_query)
+            else:
+                raise ValueError("Invalid action provided")
 
     @staticmethod
     def populate_customer(action: str, insert_count: int):
@@ -307,6 +445,36 @@ class Data:
                         .values(fake_data[indx])
                     )
                     connection.execute(update_query)
+            elif action == "delete":
+                # Check if the delete count exceeds the total number of records in the table
+                check_delete_count(customer_table, insert_count)
+
+                # Use a subquery to select random records to delete
+                subquery = (
+                    select([customer_table.c.customerid])
+                    .order_by(func.random())
+                    .limit(insert_count)
+                )
+
+                with engine.begin() as connection:
+                    related_customer_ids = [
+                        row.customerid for row in connection.execute(subquery)]
+                    # Delete related records in salesorderheader_table
+                    for customerid in related_customer_ids:
+                        # Delete records in salesorderheader_table where customerid matches
+                        delete_salesorderheader = salesorderheader_table.delete().where(
+                            salesorderheader_table.c.customerid == customerid
+                        )
+                        connection.execute(delete_salesorderheader)
+                    # Delete records in customer_table
+                    for customerid in related_customer_ids:
+                        # Delete records in customer_table where customerid matches
+                        delete_customer = customer_table.delete().where(
+                            customer_table.c.customerid == customerid
+                        )
+                        connection.execute(delete_customer)
+            else:
+                raise ValueError("Invalid action provided")
 
     @staticmethod
     def populate_personcreditcard(action: str, insert_count: int):
@@ -349,6 +517,32 @@ class Data:
                         .values(fake_data[indx])
                     )
                     connection.execute(update_query)
+            elif action == "delete":
+                # Check if the delete count exceeds the total number of records in the table
+                check_delete_count(personcreditcard_table, insert_count)
+
+                # Use a subquery to select random records to delete
+                subquery = (
+                    select([personcreditcard_table.c.businessentityid])
+                    .order_by(func.random())
+                    .limit(insert_count)
+                )
+
+                # Build a list of conditions for deletion
+                conditions = []
+                for row in connection.execute(subquery):
+                    condition = (
+                        personcreditcard_table.c.businessentityid == row.businessentityid
+                    )
+                    conditions.append(condition)
+
+                # Combine conditions using the or_ operator
+                delete_query = personcreditcard_table.delete().where(or_(*conditions))
+
+                # Execute the delete query
+                connection.execute(delete_query)
+            else:
+                raise ValueError("Invalid action provided")
 
     @staticmethod
     def populate_salesorderdetail(action: str, insert_count: int):
@@ -416,6 +610,32 @@ class Data:
                             .values(faker_data[indx])
                         )
                         connection.execute(update_query)
+                elif action == "delete":
+                    # Check if the delete count exceeds the total number of records in the table
+                    check_delete_count(salesorderdetail_table, insert_count)
+
+                    # Use a subquery to select random records to delete
+                    subquery = (
+                        select([salesorderdetail_table.c.salesorderid])
+                        .order_by(func.random())
+                        .limit(insert_count)
+                    )
+
+                    # Build a list of conditions for deletion
+                    conditions = []
+                    salesorderdetail_ids = [
+                        row.salesorderid for row in connection.execute(subquery)]
+                    for salesorderid in salesorderdetail_ids:
+                        condition = (
+                            salesorderdetail_table.c.salesorderid == salesorderid
+                        )
+                        conditions.append(condition)
+
+                    # Combine conditions using the or_ operator
+                    delete_query = salesorderdetail_table.delete().where(or_(*conditions))
+
+                    # Execute the delete query
+                    connection.execute(delete_query)
                 else:
                     raise ValueError("Invalid action provided")
             except IntegrityError as e:
@@ -509,6 +729,31 @@ class Data:
                         .values(new_data)
                     )
                     connection.execute(update_salesorderheader_query)
+            elif action == "delete":
+                # Check if the delete count exceeds the total number of records in the table
+                check_delete_count(salesorderheader_table, insert_count)
+
+                # Use a subquery to select random records to delete
+                subquery = (
+                    select([salesorderheader_table.c.salesorderid])
+                    .order_by(func.random())
+                    .limit(insert_count)
+                )
+
+                # Build a list of conditions for deletion
+                conditions = []
+                for row in connection.execute(subquery):
+                    condition = (
+                        salesorderheader_table.c.salesorderid == row.salesorderid
+                    )
+                    conditions.append(condition)
+
+                # Combine conditions using the or_ operator
+                delete_query = salesorderheader_table.delete().where(or_(*conditions))
+
+                # Execute the delete query
+                connection.execute(delete_query)
+
             else:
                 raise ValueError("Invalid action provided")
 
@@ -574,6 +819,31 @@ class Data:
                         )
                         connection.execute(
                             update_salesorderheadersalesreason_query)
+                elif action == "delete":
+                    # Check if the delete count exceeds the total number of records in the table
+                    check_delete_count(
+                        salesorderheadersalesreason_table, insert_count)
+
+                    # Use a subquery to select random records to delete
+                    subquery = (
+                        select([salesorderheadersalesreason_table.c.salesorderid])
+                        .order_by(func.random())
+                        .limit(insert_count)
+                    )
+
+                    # Build a list of conditions for deletion
+                    conditions = []
+                    for row in connection.execute(subquery):
+                        condition = (
+                            salesorderheadersalesreason_table.c.salesorderid == row.salesorderid
+                        )
+                        conditions.append(condition)
+
+                    # Combine conditions using the or_ operator
+                    delete_query = salesorderheadersalesreason_table.delete().where(or_(*conditions))
+
+                    # Execute the delete query
+                    connection.execute(delete_query)
                 else:
                     raise ValueError("Invalid action provided")
             except IntegrityError as e:
@@ -602,7 +872,8 @@ class Data:
                     existing_businessentity_ids = connection.execute(
                         select([salesperson_table.c.businessentityid])
                     ).fetchall()
-                    existing_ids = set([row[0] for row in existing_businessentity_ids])
+                    existing_ids = set([row[0]
+                                       for row in existing_businessentity_ids])
 
                     for _ in range(insert_count):
                         businessentityid = random.choice(employees)[0]
@@ -641,7 +912,8 @@ class Data:
                         is_referenced_query = select([salesorderheader_table.c.salesorderid]).where(
                             salesorderheader_table.c.salespersonid == existing_record.businessentityid
                         )
-                        is_referenced = connection.execute(is_referenced_query).fetchone()
+                        is_referenced = connection.execute(
+                            is_referenced_query).fetchone()
 
                         if is_referenced is None:
                             # Generate new data for the update (excluding primary keys)
@@ -667,6 +939,30 @@ class Data:
                             loggy.info(
                                 f"Skipping update for businessentityid {existing_record.businessentityid} as it is still referenced in salesorderheader."
                             )
+                elif action == "delete":
+                    # Check if the delete count exceeds the total number of records in the table
+                    check_delete_count(salesperson_table, insert_count)
+
+                    # Use a subquery to select random records to delete
+                    subquery = (
+                        select([salesperson_table.c.businessentityid])
+                        .order_by(func.random())
+                        .limit(insert_count)
+                    )
+
+                    # Build a list of conditions for deletion
+                    conditions = []
+                    for row in connection.execute(subquery):
+                        condition = (
+                            salesperson_table.c.businessentityid == row.businessentityid
+                        )
+                        conditions.append(condition)
+
+                    # Combine conditions using the or_ operator
+                    delete_query = salesperson_table.delete().where(or_(*conditions))
+
+                    # Execute the delete query
+                    connection.execute(delete_query)
                 else:
                     raise ValueError("Invalid action provided")
             except IntegrityError as e:
@@ -674,7 +970,6 @@ class Data:
                 duplicate_key_error_message = str(e.orig)
                 loggy.info(
                     f"Skipping duplicate key value: {duplicate_key_error_message}")
-
 
     @staticmethod
     def populate_salespersonquotahistory(action: str, insert_count: int):
@@ -730,6 +1025,30 @@ class Data:
                             update_salespersonquotahistory_query)
                     else:
                         loggy.info("Skipping duplicate key value")
+            elif action == "delete":
+                # Check if the delete count exceeds the total number of records in the table
+                check_delete_count(salespersonquotahistory_table, insert_count)
+
+                # Use a subquery to select random records to delete
+                subquery = (
+                    select([salespersonquotahistory_table.c.businessentityid])
+                    .order_by(func.random())
+                    .limit(insert_count)
+                )
+
+                # Build a list of conditions for deletion
+                conditions = []
+                for row in connection.execute(subquery):
+                    condition = (
+                        salespersonquotahistory_table.c.businessentityid == row.businessentityid
+                    )
+                    conditions.append(condition)
+
+                # Combine conditions using the or_ operator
+                delete_query = salespersonquotahistory_table.delete().where(or_(*conditions))
+
+                # Execute the delete query
+                connection.execute(delete_query)
             else:
                 raise ValueError("Invalid action provided")
 
@@ -771,6 +1090,32 @@ class Data:
                         .values(new_data)
                     )
                     connection.execute(update_salesreason_query)
+            elif action == "delete":
+                # Check if the delete count exceeds the total number of records in the table
+                check_delete_count(salesreason_table, insert_count)
+
+                # Use a subquery to select random records to delete
+                subquery = (
+                    select([salesreason_table.c.salesreasonid])
+                    .order_by(func.random())
+                    .limit(insert_count)
+                )
+
+                with engine.begin() as connection:
+                    related_salesreasonids = [
+                        row.salesreasonid for row in connection.execute(subquery)]
+                    # Delete related records in salesorderheadersalesreason_table FK Cascade
+                    for salesreasonid in related_salesreasonids:
+                        delete_salesorderheadersalesreason = salesorderheadersalesreason_table.delete().where(
+                            salesorderheadersalesreason_table.c.salesreasonid == salesreasonid
+                        )
+                        connection.execute(delete_salesorderheadersalesreason)
+                    # Delete records in salesreason_table
+                    for salesreasonid in related_salesreasonids:
+                        delete_customer = salesreason_table.delete().where(
+                            salesreason_table.c.salesreasonid == salesreasonid
+                        )
+                        connection.execute(delete_customer)
             else:
                 raise ValueError("Invalid action provided")
 
@@ -823,6 +1168,30 @@ class Data:
                         .values(new_data)
                     )
                     connection.execute(update_salestaxrate_query)
+            elif action == "delete":
+                # Check if the delete count exceeds the total number of records in the table
+                check_delete_count(salestaxrate_table, insert_count)
+
+                # Use a subquery to select random records to delete
+                subquery = (
+                    select([salestaxrate_table.c.salestaxrateid])
+                    .order_by(func.random())
+                    .limit(insert_count)
+                )
+
+                # Build a list of conditions for deletion
+                conditions = []
+                for row in connection.execute(subquery):
+                    condition = (
+                        salestaxrate_table.c.salestaxrateid == row.salestaxrateid
+                    )
+                    conditions.append(condition)
+
+                # Combine conditions using the or_ operator
+                delete_query = salestaxrate_table.delete().where(or_(*conditions))
+
+                # Execute the delete query
+                connection.execute(delete_query)
             else:
                 raise ValueError("Invalid action provided")
 
@@ -922,6 +1291,53 @@ class Data:
                         .values(new_data)
                     )
                     connection.execute(update_salesterritory_query)
+            elif action == "delete":
+                # Check if the delete count exceeds the total number of records in the table
+                check_delete_count(salesterritory_table, insert_count)
+
+                # Use a subquery to select random records to delete
+                subquery = (
+                    select([salesterritory_table.c.territoryid])
+                    .order_by(func.random())
+                    .limit(insert_count)
+                )
+
+                # Delete from customer table first to avoid FK constraint violation
+                with engine.begin() as connection:
+                    related_territoryids = [
+                        row.territoryid for row in connection.execute(subquery)]
+
+                    # Delete related records in customer_table
+                    for territoryid in related_territoryids:
+                        # Get customerid from customer table here and delete salesorderheader_table records
+                        customerids = connection.execute(
+                            select([customer_table.c.customerid]).where(
+                                customer_table.c.territoryid == territoryid
+                            )
+                        ).fetchall()
+                        for customerid in customerids:
+                            delete_qry = salesorderheader_table.delete().where(
+                                salesorderheader_table.c.customerid == customerid
+                            )
+                            connection.execute(delete_qry)
+
+                        # Delete customer_table records
+                        delete_qry = customer_table.delete().where(
+                            customer_table.c.territoryid == territoryid
+                        )
+                        connection.execute(delete_qry)
+                    # Delete related records in salesperson_table
+                    for territoryid in related_territoryids:
+                        delete_qry = salesperson_table.delete().where(
+                            salesperson_table.c.territoryid == territoryid
+                        )
+                        connection.execute(delete_qry)
+                    # Delete records in salesterritory_table
+                    for territoryid in related_territoryids:
+                        delete_qry = salesterritory_table.delete().where(
+                            salesterritory_table.c.territoryid == territoryid
+                        )
+                        connection.execute(delete_qry)
             else:
                 raise ValueError("Invalid action provided")
 
@@ -1007,6 +1423,31 @@ class Data:
                             .values(new_data)
                         )
                         connection.execute(update_salesterritoryhistory_query)
+                elif action == "delete":
+                    # Check if the delete count exceeds the total number of records in the table
+                    check_delete_count(
+                        salesterritoryhistory_table, insert_count)
+
+                    # Use a subquery to select random records to delete
+                    subquery = (
+                        select([salesterritoryhistory_table.c.businessentityid])
+                        .order_by(func.random())
+                        .limit(insert_count)
+                    )
+
+                    # Build a list of conditions for deletion
+                    conditions = []
+                    for row in connection.execute(subquery):
+                        condition = (
+                            salesterritoryhistory_table.c.businessentityid == row.businessentityid
+                        )
+                        conditions.append(condition)
+
+                    # Combine conditions using the or_ operator
+                    delete_query = salesterritoryhistory_table.delete().where(or_(*conditions))
+
+                    # Execute the delete query
+                    connection.execute(delete_query)
                 else:
                     raise ValueError("Invalid action provided")
             except IntegrityError as e:
@@ -1060,6 +1501,30 @@ class Data:
                         .values(new_data)
                     )
                     connection.execute(update_shoppingcartitem_query)
+            elif action == "delete":
+                # Check if the delete count exceeds the total number of records in the table
+                check_delete_count(shoppingcartitem_table, insert_count)
+
+                # Use a subquery to select random records to delete
+                subquery = (
+                    select([shoppingcartitem_table.c.shoppingcartitemid])
+                    .order_by(func.random())
+                    .limit(insert_count)
+                )
+
+                # Build a list of conditions for deletion
+                conditions = []
+                for row in connection.execute(subquery):
+                    condition = (
+                        shoppingcartitem_table.c.shoppingcartitemid == row.shoppingcartitemid
+                    )
+                    conditions.append(condition)
+
+                # Combine conditions using the or_ operator
+                delete_query = shoppingcartitem_table.delete().where(or_(*conditions))
+
+                # Execute the delete query
+                connection.execute(delete_query)
             else:
                 raise ValueError("Invalid action provided")
 
@@ -1113,10 +1578,39 @@ class Data:
                     )
                     connection.execute(update_query)
 
+            elif action == "delete":
+                # Check if the delete count exceeds the total number of records in the table
+                check_delete_count(specialoffer_table, insert_count)
+
+                # Use a subquery to select random records to delete
+                subquery = (
+                    select([specialoffer_table.c.specialofferid])
+                    .order_by(func.random())
+                    .limit(insert_count)
+                )
+
+                # Delete specialofferproduct_table FK Cascade
+                with engine.begin() as connection:
+                    related_specialofferids = [
+                        row.specialofferid for row in connection.execute(subquery)]
+                    # Delete related records in specialofferproduct_table
+                    for specialofferid in related_specialofferids:
+                        delete_specialofferproduct = specialofferproduct_table.delete().where(
+                            specialofferproduct_table.c.specialofferid == specialofferid
+                        )
+                        connection.execute(delete_specialofferproduct)
+                    # Delete records in specialoffer_table
+                    for specialofferid in related_specialofferids:
+                        delete_specialoffer = specialoffer_table.delete().where(
+                            specialoffer_table.c.specialofferid == specialofferid
+                        )
+                        connection.execute(delete_specialoffer)
+            else:
+                raise ValueError("Invalid action provided")
+
     @staticmethod
     def populate_specialofferproduct(action: str, insert_count: int):
         """Add data to the specialofferproduct table."""
-
         # Generate faker data
         with engine.connect() as connection:
             # FK's
@@ -1181,6 +1675,38 @@ class Data:
                             .values(new_data)
                         )
                         connection.execute(update_specialofferproduct_query)
+                elif action == "delete":
+                    check_delete_count(
+                        specialofferproduct_table, insert_count)
+
+                    # Use a subquery to select random records to delete
+                    subquery = (
+                        select([specialofferproduct_table.c.specialofferid,
+                            specialofferproduct_table.c.productid])
+                        .order_by(func.random())
+                        .limit(insert_count)
+                    )
+
+                    # Delete from salesorderdetail_table this combination first to avoid FK constraint violation
+                    related_records = connection.execute(subquery)
+                    # Delete related records in salesorderdetail_table
+                    for row in related_records:
+                        delete_qry = salesorderdetail_table.delete().where(
+                            and_(
+                                salesorderdetail_table.c.specialofferid == row.specialofferid,
+                                salesorderdetail_table.c.productid == row.productid
+                            )
+                        )
+                        connection.execute(delete_qry)
+                    # Delete records in specialofferproduct_table
+                    for row in related_records:
+                        delete_qry = specialofferproduct_table.delete().where(
+                            and_(
+                                specialofferproduct_table.c.specialofferid == row.specialofferid,
+                                specialofferproduct_table.c.productid == row.productid
+                            )
+                        )
+                        connection.execute(delete_qry)
                 else:
                     raise ValueError("Invalid action provided")
             except IntegrityError as e:
@@ -1258,6 +1784,26 @@ class Data:
                             .values(new_data)
                         )
                         connection.execute(update_store_query)
+                elif action == "delete":
+                    # Check if the delete count exceeds the total number of records in the table
+                    check_delete_count(store_table, insert_count)
+
+                    # Use a subquery to select random records to delete
+                    subquery = (
+                        select([store_table.c.businessentityid])
+                        .order_by(func.random())
+                        .limit(insert_count)
+                    )
+
+                    with engine.begin() as connection:
+                        related_businessentityids = [
+                            row.businessentityid for row in connection.execute(subquery)]
+                        # Delete records in store_table
+                        for businessentityid in related_businessentityids:
+                            delete_store = store_table.delete().where(
+                                store_table.c.businessentityid == businessentityid
+                            )
+                            connection.execute(delete_store)
                 else:
                     raise ValueError("Invalid action provided")
             except IntegrityError as e:

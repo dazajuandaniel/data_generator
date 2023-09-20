@@ -8,7 +8,7 @@ loggy = get_logger(__name__)
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--action", type=str,
-                        default='create', choices=['create', 'edit'])
+                        default='create', choices=['create', 'edit', 'delete'])
     parser.add_argument("--table", type=str, default=None)
     parser.add_argument("--num_records", type=int, default=1)
     args, _ = parser.parse_known_args()
