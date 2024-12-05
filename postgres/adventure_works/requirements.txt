@@ -1,6 +1,0 @@
-Faker
-psycopg2-binary
-SQLAlchemy==1.4.39
-Pillow
-alembic
-python-dotenv

@@ -8,20 +8,18 @@ import warnings
 from sqlalchemy.exc import SAWarning, IntegrityError
 from faker import Faker
 from sqlalchemy import create_engine, MetaData, select, and_
-from logger import get_logger
+from loguru import logger as loggy
 from dotenv import load_dotenv
 
-BASEDIR = os.path.abspath(os.path.dirname(__file__))
-load_dotenv(dotenv_path=os.path.join(BASEDIR, '../.env'))
+load_dotenv(dotenv_path='.env')
 
-loggy = get_logger(__name__)
 
 # Provide the PostgreSQL connection details
-host = os.getenv("PGHOST")
-database = os.getenv("ADVENTUREWORKSNAME")
-user = os.getenv("PGUSER")
-password = os.getenv("PGPASSWORD")
-port = os.getenv("PGPORT")
+host = os.getenv("DATABASE_HOST")
+database = os.getenv("DATABASE_NAME")
+user = os.getenv("DATABASE_USER")
+password = os.getenv("DATABASE_PASSWORD")
+port = os.getenv("DATABASE_PORT", 5432)
 
 # Create the SQLAlchemy engine
 engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}/{database}")
@@ -30,20 +28,22 @@ engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}/{database}
 faker = Faker()
 
 # Create a metadata object
-metadata = MetaData(bind=engine)
+metadata = MetaData()
+metadata.reflect(bind=engine)
 
+print(metadata.tables.items())
 # Ignore terminal xml type warnings
 warnings.filterwarnings("ignore", category=SAWarning)
 
 # Reflect metadata/schema from existing postgres database
-with engine.connect() as conn:
-    metadata.reflect(bind=engine)
-    # Need to reflect every schema here to load tables from db
-    metadata.reflect(schema="sales")
-    metadata.reflect(schema="person")
-    metadata.reflect(schema="humanresources")
-    metadata.reflect(schema="production")
-    metadata.reflect(schema="purchasing")
+# with engine.connect() as conn:
+#     metadata.reflect(bind=engine)
+#     # Need to reflect every schema here to load tables from db
+#     metadata.reflect(schema="sales")
+#     metadata.reflect(schema="person")
+#     metadata.reflect(schema="humanresources")
+#     metadata.reflect(schema="production")
+#     metadata.reflect(schema="purchasing")
 
 
 #########Create table objects############

@@ -1,6 +1,6 @@
 #!/usr/bin/env make
-include ./resources/Makehelp
-include ./resources/bootstrap.mk
+include ./makefile_resources/Makehelp
+include ./makefile_resources/bootstrap.mk
 include ./.env
 
 # Targets
@@ -25,15 +25,13 @@ venv:
     )
 .PHONY: venv
 
-## Creates Adventure Works Database
-db_create:
-	@ PGPASSWORD=mysecretpassword psql -U $(PGUSER) -p $(PGPORT) -d $(PGDATABASE) -h $(PGHOST) -c 'CREATE DATABASE $(ADVENTUREWORKSNAME)'
-.PHONY: db_create
-
-## Creates Adventure Works Database Tables & Schemas & Seeds Data
-db_bootstrap:
-	@ PGPASSWORD=mysecretpassword psql -U $(PGUSER) -p $(PGPORT) -d $(ADVENTUREWORKSNAME) -h $(PGHOST) -f sql/install.sql
-.PHONY: db_bootstrap
+## Creates Adventure Works Database Tables & Schemas & Seeds Data in Postgres DB
+postgres-bootstrap:
+	@ ( \
+		cd postgres/adventure_works; \
+		PGPASSWORD=$(DATABASE_PASSWORD) psql -U $(DATABASE_USER) -p $(DATABASE_PORT) -d postgres -h $(DATABASE_HOST) -f sql/install.sql; \
+	)
+.PHONY: postgres_create
 
 ## Create header
 _header:
