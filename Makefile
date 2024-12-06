@@ -26,12 +26,21 @@ venv:
 .PHONY: venv
 
 ## Creates Adventure Works Database Tables & Schemas & Seeds Data in Postgres DB
-postgres-bootstrap:
+postgres-bootstrap-north-wind:
+	@ ( \
+		cd postgres/north_wind; \
+		PGPASSWORD=$(DATABASE_PASSWORD) psql -U $(DATABASE_USER) -p $(DATABASE_PORT) -d postgres -h $(DATABASE_HOST) -f install.sql; \
+	)
+.PHONY: postgres-bootstrap-north-wind
+
+
+## Creates North Wind Database Tables & Schemas & Seeds Data in Postgres DB
+postgres-bootstrap-adventure-works:
 	@ ( \
 		cd postgres/adventure_works; \
 		PGPASSWORD=$(DATABASE_PASSWORD) psql -U $(DATABASE_USER) -p $(DATABASE_PORT) -d postgres -h $(DATABASE_HOST) -f sql/install.sql; \
 	)
-.PHONY: postgres_create
+.PHONY: postgres-bootstrap-adventure-works
 
 ## Create header
 _header:

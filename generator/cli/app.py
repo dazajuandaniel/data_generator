@@ -1,7 +1,7 @@
 import os
 import typer
 import logging
-from generator.postgres.adventure_works.crud import GenerateData
+from generator.postgres.adventure_works.crud import AdventureWorks
 app = typer.Typer()
 
 @app.callback()
@@ -11,7 +11,8 @@ def callback():
 
 @app.command(name="create-record")
 def create_record(
-    database: str = typer.Option(
+    schema: str = typer.Option(
+        "public",
         "--database",
         help="The name of the database to create a record in"
     ),
@@ -25,7 +26,6 @@ def create_record(
     )
 ):
     """Creates a record in the specified table"""
-    print("Success")
-    generate_data = GenerateData(table=table, num_records=num_records)
-    generate_data.create_data()
+    generate_data = AdventureWorks(schema=schema, table=table)
+    generate_data.insert(num_records)
 
